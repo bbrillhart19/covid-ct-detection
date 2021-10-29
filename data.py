@@ -1,9 +1,11 @@
+import os
+from torch.utils.data import Dataset
 import nibabel as nib 
 import pandas as pd 
 import matplotlib.pyplot as plt 
-import os
-from utils import *
 from tqdm import tqdm
+
+from utils import *
 
 def read_nii(filepath):
     '''
@@ -17,9 +19,11 @@ def read_nii(filepath):
 class CTDataLoader():
     def __init__(self, data_path, *args, **kwargs):
 
+        # TODO: move to config
         # Define dataset folder
         self.data_path = data_path
 
+        # TODO: Move to config
         # Define metadata path and load into raw_data
         self.metadata_fn = data_path + os.sep + 'metadata.csv'
         self.metadata_df = pd.read_csv(self.metadata_fn)
@@ -115,6 +119,16 @@ class CTDataLoader():
         plt.imshow(data[..., slice_num], cmap='bone')
         plt.title(key + ' image')
         plt.show()
+
+class CTSliceDataset(Dataset):
+    def __init__(self, data_path):
+        self.images = [os.path.join(data_path,image) for image in os.listdir(data_path)]
+
+    def __getitem__(self, idx):
+        image = np.load(self.images[idx])
+
+    def __len__(self):
+        return len(self.images)
 
 if __name__=="__main__":
     dataloader = CTDataLoader('data')
