@@ -25,7 +25,7 @@ class CTDataLoader():
 
         # TODO: Move to config
         # Define metadata path and load into raw_data
-        self.metadata_fn = data_path + os.sep + 'metadata.csv'
+        self.metadata_fn = self.data_path + os.sep + 'metadata.csv'
         self.metadata_df = pd.read_csv(self.metadata_fn)
 
         # Update metadata paths
@@ -58,7 +58,7 @@ class CTDataLoader():
             train_num = int(train*len(image_types[image_type]))
             for train_image in image_types[image_type][:train_num]:
                 self.save_npy_slices(train_image, 'train')
-            for test_image in image_types[image_type][train_num:len(image_types[image_type])]:
+            for test_image in image_types[image_type][train_num:]:
                 self.save_npy_slices(test_image, 'test')        
 
     def save_npy_slices(self, image, path):
@@ -122,13 +122,38 @@ class CTDataLoader():
 
 class CTSliceDataset(Dataset):
     def __init__(self, data_path):
-        self.images = [os.path.join(data_path,image) for image in os.listdir(data_path)]
+        self.data_path = data_path
+
+        self.metadata_fn = self.data_path + os.sep + 'metadata.csv'
+        self.metadata_df = pd.read_csv(self.metadata_fn)
+
+        # Update metadata paths
+        self.update_metadata_paths()
+
+        ct_path = os.path.join(self.data_path,'ct_images')
+        self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]
+
+    # Function to change metadata values to data_path
+    def update_metadata_paths(self):
+        for idx, row in self.metadata_df.iterrows():
+            for key in self.metadata_df.keys():
+                new_value = row[key].replace('../input/covid19-ct-scans',self.data_path).replace('/',os.sep) 
+                self.metadata_df.iloc[idx] = row.replace([row[key]], new_value)        
 
     def __getitem__(self, idx):
-        image = np.load(self.images[idx])
+        ct_image_id = '_'.join(*self.ct_images[idx].split('_')[:-1])
+        slice_num = self.ct_images[idx].split('_')[-1]
+        lung_inf_mask_id = self.metadata_df.loc[self.metadata_df['ct_scan']==ct_image_id]['lung_and_infection_mask'][0]
+        lung_inf_mask_id += '_'+slice_num
+        
+        ct_image = np.load(self.ct_images[idx])
+        lung_inf_mask = np.load(lung_inf_mask_id)
+
+        # TODO: Make targets -> boxes for L/R lung, masks for all        
+        
 
     def __len__(self):
-        return len(self.images)
+        return len(self.ct_images)
 
 if __name__=="__main__":
     dataloader = CTDataLoader('data')
