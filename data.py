@@ -44,7 +44,7 @@ class CTDataLoader():
         Make sure even data of corona and radio image_types
         Save slices as <train/test>/<dtype>/<fn>_slice<slice_idx>.npy
         '''
-        # TODO: Move to config
+        # TODO: Move to config???
         image_types = dict(
             corona = [],
             radio = [],
@@ -52,44 +52,44 @@ class CTDataLoader():
 
         for image_type in image_types.keys():
             print('Image Type:',image_type)
-            for image in [img for img in self.metadata_df['ct_scan'].values if image_type in img]:
-                image_types[image_type].append(image)
+            for idx in self.metadata_df.index[self.metadata_df['ct_scan'].str.contains(image_type)]:
+                image_types[image_type].append(idx)
 
             train_num = int(train*len(image_types[image_type]))
-            for train_image in image_types[image_type][:train_num]:
-                self.save_npy_slices(train_image, 'train')
-            for test_image in image_types[image_type][train_num:]:
-                self.save_npy_slices(test_image, 'test')        
+            for train_idx in image_types[image_type][:train_num]:
+                self.save_npy_slices(train_idx, 'train')
+            for test_idx in image_types[image_type][train_num:]:
+                self.save_npy_slices(test_idx, 'test')        
 
-    def save_npy_slices(self, image, path):
+    def save_npy_slices(self, idx, path):
+        # NOTE: Renames masks with ct_scan name for convenience in CTSliceDataset
         for key in self.metadata_df.keys():
             print('Saving',path,key,'>>>')
-            fn = self.metadata_df.loc[self.metadata_df['ct_scan']==image][key][0]
-            base_path = ensure(os.path.join(*fn.replace(self.data_path,path).split(os.sep)[:-1]))
-            name = fn.split(os.sep)[-1]
-            data = self.load_data(fn, key)
-            for slice_num in tqdm(range(data.shape[-1]),desc=name):
-                npy_file = name.replace('.nii','_slice'+str(slice_num)+'.npy')
+            fn = os.path.basename(self.metadata_df.loc[idx,'ct_scan'])
+            base_path = ensure(os.path.join(path,key))
+            data = self.load_data(idx, key)
+            for slice_num in tqdm(range(data.shape[-1]),desc=fn):
+                npy_file = fn.replace('.nii','_slice'+str(slice_num)+'.npy')
                 np.save(os.path.join(base_path,npy_file),data[...,slice_num])
 
-    def load_data_all(self, fn):
+    def load_data_all(self, idx):
         # Load all data types for single image
-        data_list = [self.load_data(fn, key) for key in self.metadata_df.keys()]
+        data_list = [self.load_data(idx, key) for key in self.metadata_df.keys()]
         return data_list
 
-    def load_data(self, fn, key=None):
+    def load_data(self, idx, key=None):
         # Load a single data type by key for single image
         assert key is not None
-        data = read_nii(self.metadata_df.loc[self.metadata_df[key]==fn][key][0])
+        data = read_nii(self.metadata_df.loc[idx,key])
         return data
     
-    def display_all(self, fn, slice_num=0, color_map = 'nipy_spectral'):
+    def display_all(self, idx, slice_num=0, color_map = 'nipy_spectral'):
         '''
         Plots and a slice with all available annotations
         '''
-        data_list = self.load_data_all(fn)
+        data_list = self.load_data_all(idx)
 
-        fig = plt.figure(figsize=(18,15))
+        fig = plt.figure(figsize=(18,5))
 
         plt.subplot(1,4,1)
         plt.imshow(data_list[0][..., slice_num], cmap='bone')
@@ -124,27 +124,11 @@ class CTSliceDataset(Dataset):
     def __init__(self, data_path):
         self.data_path = data_path
 
-        self.metadata_fn = self.data_path + os.sep + 'metadata.csv'
-        self.metadata_df = pd.read_csv(self.metadata_fn)
-
-        # Update metadata paths
-        self.update_metadata_paths()
-
-        ct_path = os.path.join(self.data_path,'ct_images')
-        self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]
-
-    # Function to change metadata values to data_path
-    def update_metadata_paths(self):
-        for idx, row in self.metadata_df.iterrows():
-            for key in self.metadata_df.keys():
-                new_value = row[key].replace('../input/covid19-ct-scans',self.data_path).replace('/',os.sep) 
-                self.metadata_df.iloc[idx] = row.replace([row[key]], new_value)        
+        ct_path = os.path.join(self.data_path,'ct_scan')
+        self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]     
 
     def __getitem__(self, idx):
-        ct_image_id = '_'.join(*self.ct_images[idx].split('_')[:-1])
-        slice_num = self.ct_images[idx].split('_')[-1]
-        lung_inf_mask_id = self.metadata_df.loc[self.metadata_df['ct_scan']==ct_image_id]['lung_and_infection_mask'][0]
-        lung_inf_mask_id += '_'+slice_num
+        lung_inf_mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
         
         ct_image = np.load(self.ct_images[idx])
         lung_inf_mask = np.load(lung_inf_mask_id)
@@ -158,6 +142,7 @@ class CTSliceDataset(Dataset):
 if __name__=="__main__":
     dataloader = CTDataLoader('data')
     dataloader.split_data()
+    # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
     #     data0 = dataloader.load_data(0,key)
