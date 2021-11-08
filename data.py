@@ -1,5 +1,5 @@
 import os
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import nibabel as nib 
 import pandas as pd 
 import matplotlib.pyplot as plt 
@@ -69,8 +69,9 @@ class CTDataLoader():
             base_path = ensure(os.path.join(path,key))
             data = self.load_data(idx, key)
             for slice_num in tqdm(range(data.shape[-1]),desc=fn):
-                npy_file = fn.replace('.nii','_slice'+str(slice_num)+'.npy')
-                np.save(os.path.join(base_path,npy_file),data[...,slice_num])
+                npy_file = os.path.join(base_path,fn.replace('.nii','_slice'+str(slice_num)+'.npy'))
+                if not os.path.exists(npy_file):
+                    np.save(npy_file,data[...,slice_num])
 
     def load_data_all(self, idx):
         # Load all data types for single image
@@ -121,27 +122,60 @@ class CTDataLoader():
         plt.show()
 
 class CTSliceDataset(Dataset):
-    def __init__(self, data_path):
+    def __init__(self, data_path, mode=None, transform=None):
+        # Lung mode for training SSD, infection mode for Unet (not available yet)
+        assert mode in ['lung','infection']
+        self.mode = mode
         self.data_path = data_path
+        self.transform = transform
 
         ct_path = os.path.join(self.data_path,'ct_scan')
         self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]     
 
     def __getitem__(self, idx):
-        lung_inf_mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
-        
+        # Get mask based on mode
+        mask_id = self.ct_images[idx].replace('ct_scan',self.mode+'_mask')
+        # Load ct scan and mask 
         ct_image = np.load(self.ct_images[idx])
-        lung_inf_mask = np.load(lung_inf_mask_id)
+        mask = np.load(mask_id)
 
-        # TODO: Make targets -> boxes for L/R lung, masks for all        
-        
+        if self.mode == 'lung':
+            # Set boxes/labels for targets
+            lungs = np.unique(mask)
+            lungs = lungs[1:]
+            masks = mask == lungs[:, None, None]
+            boxes = []
+            labels = []            
+            for lung in lungs:
+                pos = np.where(masks[int(lung-1)])
+                xmin = np.min(pos[1])
+                xmax = np.max(pos[1])
+                ymin = np.min(pos[0])
+                ymax = np.max(pos[0])
+                boxes.append([xmin, ymin, xmax, ymax])
+                labels.append(int(lung))
+            boxes = torch.as_tensor(boxes, dtype=torch.float32)
+            labels = torch.as_tensor(labels, dtype=torch.int64)
+            target = dict(
+                boxes=boxes,
+                labels=labels
+            )
+            if self.transform:
+                ct_image, target = self.transform(ct_image, target)
+        return ct_image, target      
 
     def __len__(self):
         return len(self.ct_images)
 
 if __name__=="__main__":
-    dataloader = CTDataLoader('data')
-    dataloader.split_data()
+    # dataloader = CTDataLoader('data')
+    # dataloader.split_data()
+    test_dataset = CTSliceDataset('test',mode='lung')
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=2, shuffle=False, num_workers=4, collate_fn=collate_fn
+    )
+    for batch in test_dataloader:
+        print(batch)
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
