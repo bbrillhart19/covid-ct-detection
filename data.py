@@ -138,31 +138,10 @@ class CTSliceDataset(Dataset):
         # Load ct scan and mask 
         ct_image = np.load(self.ct_images[idx])
         mask = np.load(mask_id)
-
         if self.mode == 'lung':
-            # Set boxes/labels for targets
-            lungs = np.unique(mask)
-            lungs = lungs[1:]
-            masks = mask == lungs[:, None, None]
-            boxes = []
-            labels = []            
-            for lung in lungs:
-                pos = np.where(masks[int(lung-1)])
-                xmin = np.min(pos[1])
-                xmax = np.max(pos[1])
-                ymin = np.min(pos[0])
-                ymax = np.max(pos[0])
-                boxes.append([xmin, ymin, xmax, ymax])
-                labels.append(int(lung))
-            boxes = torch.as_tensor(boxes, dtype=torch.float32)
-            labels = torch.as_tensor(labels, dtype=torch.int64)
-            target = dict(
-                boxes=boxes,
-                labels=labels
-            )
-            if self.transform:
-                ct_image, target = self.transform(ct_image, target)
-        return ct_image, target      
+            mask[mask==2] = 1
+        
+        return ct_image, mask     
 
     def __len__(self):
         return len(self.ct_images)
@@ -174,8 +153,8 @@ if __name__=="__main__":
     test_dataloader = DataLoader(
         test_dataset, batch_size=2, shuffle=False, num_workers=4, collate_fn=collate_fn
     )
-    for batch in test_dataloader:
-        print(batch)
+    for ct_image_mask in test_dataloader:
+        continue
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
