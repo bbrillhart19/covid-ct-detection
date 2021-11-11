@@ -140,6 +140,9 @@ class CTSliceDataset(Dataset):
         mask = np.load(mask_id)
         if self.mode == 'lung':
             mask[mask==2] = 1
+            
+        if self.transform is not None:
+            ct_image, mask = self.transform(ct_image, mask)
         
         return ct_image, mask     
 
@@ -153,7 +156,7 @@ if __name__=="__main__":
     test_dataloader = DataLoader(
         test_dataset, batch_size=2, shuffle=False, num_workers=4, collate_fn=collate_fn
     )
-    for ct_image_mask in test_dataloader:
+    for ct_image, mask in test_dataloader:
         continue
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
