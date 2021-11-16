@@ -151,7 +151,10 @@ class CTSliceDataset(Dataset):
         lung_mask[mask == 3] = 0
         lung_mask = np.stack([lung_mask,lung_mask],axis=0)
         lung_mask[0][mask == 2] = 0
+        lung_mask[0][mask == 1] = 1
         lung_mask[1][mask == 1] = 0
+        lung_mask[1][mask == 2] = 1
+        
 
         # Infection mask 1xHxW
         inf_mask = mask.copy()
@@ -168,8 +171,6 @@ class CTSliceDataset(Dataset):
     def __len__(self):
         return len(self.ct_images)
 
-# TODO: need to resize to 512, 512 and ToTensor
-
 # Transforms
 
 class ToTensor(object):
@@ -183,7 +184,7 @@ if __name__=="__main__":
     # dataloader = CTDataLoader('data')
     # dataloader.split_data()
     test_transform = transforms.Compose([ToTensor()])
-    test_dataset = CTSliceDataset('test', 512, transform=test_transform)
+    test_dataset = CTSliceDataset('test', 256, transform=test_transform)
     test_dataloader = DataLoader(
         test_dataset, batch_size=4, shuffle=False, num_workers=4,) #collate_fn=collate_fn
     for x in test_dataloader:
