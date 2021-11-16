@@ -1,6 +1,8 @@
 import os
+from skimage import transform
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, dataloader
+import torch.nn.functional as F
 import nibabel as nib 
 import pandas as pd 
 import matplotlib.pyplot as plt 
@@ -9,6 +11,8 @@ from skimage.transform import resize
 
 
 from utils import *
+
+IMAGE_TYPES = ['corona','radio']
 
 def read_nii(filepath):
     '''
@@ -47,11 +51,7 @@ class CTDataLoader():
         Make sure even data of corona and radio image_types
         Save slices as <train/test>/<dtype>/<fn>_slice<slice_idx>.npy
         '''
-        # TODO: Move to config???
-        image_types = dict(
-            corona = [],
-            radio = [],
-        )
+        image_types = {image_type:[] for image_type in IMAGE_TYPES}
 
         for image_type in image_types.keys():
             print('Image Type:',image_type)
@@ -135,13 +135,19 @@ class CTSliceDataset(Dataset):
         self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]     
 
     def __getitem__(self, idx):
-        # Get mask based on mode
-        mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
-        # Load ct scan and mask and resize to size
+        # Set image type id
+        for i, image_type in enumerate(IMAGE_TYPES):
+            if image_type in self.ct_images[idx]:
+                image_type_id = i   
+
+        # Load ct scan and resize
         ct_image = np.load(self.ct_images[idx])
         ct_image = resize(ct_image, self.size, mode='reflect', preserve_range=True, anti_aliasing=True)
         ct_image = np.expand_dims(ct_image, axis=0)
+        ct_image = normalize(ct_image)
 
+         # Get mask and resize
+        mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
         mask = np.load(mask_id)
         mask = resize(mask, self.size, mode='reflect', preserve_range=True, anti_aliasing=True)
 
@@ -161,7 +167,7 @@ class CTSliceDataset(Dataset):
         inf_mask[mask < 3] = 0
         inf_mask = np.expand_dims(inf_mask, axis=0)
 
-        x = {'ct_scan':ct_image,'lung':lung_mask,'inf':inf_mask}
+        x = {'ct_scan':ct_image,'lung':lung_mask,'inf':inf_mask,'id':image_type_id}
 
         if self.transform is not None:
             x = self.transform(x)
@@ -173,24 +179,39 @@ class CTSliceDataset(Dataset):
 
 # Transforms
 
-class ToTensor(object):
-    def __call__(self, x):
-        for data in x.keys():
-            x[data] = torch.from_numpy(x[data].copy())
-        return x
-
+# Distribution utilities
+def calculate_mean_offset(base_image_type='corona'):
+    image_types = {image_type:[] for image_type in IMAGE_TYPES}
+    for dataset_type in ['train','test']:
+        
+        dataset = CTSliceDataset(dataset_type, 256, transform=None)
+        dataloader = DataLoader(
+            dataset, batch_size=4, shuffle=False, num_workers=4
+        )
+        for x in tqdm(dataloader,desc='Calculating '+dataset_type+' means'):
+            ct_images = x['ct_scan']
+            ids = x['id']
+            for i in range(ct_images.shape[0]):
+                image_types[IMAGE_TYPES[int(ids[i])]].append(torch.mean(ct_images[i])) 
+        for image_type in image_types.keys():
+            total = len(image_types[image_type])
+            mean = sum(image_types[image_type]) / total if total > 0 else 'N/A'
+            print(dataset_type,image_type,'total:',total)
+            print(dataset_type,image_type,'mean:',mean)
 
 if __name__=="__main__":
+    calculate_mean_offset()
     # dataloader = CTDataLoader('data')
     # dataloader.split_data()
-    test_transform = transforms.Compose([ToTensor()])
-    test_dataset = CTSliceDataset('test', 256, transform=test_transform)
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=4, shuffle=False, num_workers=4,) #collate_fn=collate_fn
-    for x in test_dataloader:
-        for data in x.keys():
-            print(data,'>>>')
-            print(x[data].size())
+    # test_transform = transforms.Compose([ToTensor()])
+    # test_dataset = CTSliceDataset('test', 256, transform=test_transform)
+    # test_dataloader = DataLoader(
+    #     test_dataset, batch_size=4, shuffle=False, num_workers=4,) #collate_fn=collate_fn
+    # for x in test_dataloader:
+    #     continue
+        # for data in x.keys():
+        #     print(data,'>>>')
+        #     print(x[data].size())
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
