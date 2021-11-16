@@ -1,9 +1,12 @@
 import os
+from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 import nibabel as nib 
 import pandas as pd 
 import matplotlib.pyplot as plt 
 from tqdm import tqdm
+from skimage.transform import resize
+
 
 from utils import *
 
@@ -122,42 +125,71 @@ class CTDataLoader():
         plt.show()
 
 class CTSliceDataset(Dataset):
-    def __init__(self, data_path, mode=None, transform=None):
+    def __init__(self, data_path, size, transform=None):
         # Lung mode for training SSD, infection mode for Unet (not available yet)
-        assert mode in ['lung','infection']
-        self.mode = mode
         self.data_path = data_path
         self.transform = transform
+        self.size = (size, size)
 
         ct_path = os.path.join(self.data_path,'ct_scan')
         self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]     
 
     def __getitem__(self, idx):
         # Get mask based on mode
-        mask_id = self.ct_images[idx].replace('ct_scan',self.mode+'_mask')
-        # Load ct scan and mask 
+        mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
+        # Load ct scan and mask and resize to size
         ct_image = np.load(self.ct_images[idx])
+        ct_image = resize(ct_image, self.size, mode='reflect', preserve_range=True, anti_aliasing=True)
+        ct_image = np.expand_dims(ct_image, axis=0)
+
         mask = np.load(mask_id)
-        if self.mode == 'lung':
-            mask[mask==2] = 1
-            
+        mask = resize(mask, self.size, mode='reflect', preserve_range=True, anti_aliasing=True)
+
+        # 1-> RLung 2-> LLung 3 -> Infection
+        # Lung mask 2xHxW
+        lung_mask = mask.copy()
+        lung_mask[mask == 3] = 0
+        lung_mask = np.stack([lung_mask,lung_mask],axis=0)
+        lung_mask[0][mask == 2] = 0
+        lung_mask[1][mask == 1] = 0
+
+        # Infection mask 1xHxW
+        inf_mask = mask.copy()
+        inf_mask[mask < 3] = 0
+        inf_mask = np.expand_dims(inf_mask, axis=0)
+
+        x = {'ct_scan':ct_image,'lung':lung_mask,'inf':inf_mask}
+
         if self.transform is not None:
-            ct_image, mask = self.transform(ct_image, mask)
+            x = self.transform(x)
         
-        return ct_image, mask     
+        return x    
 
     def __len__(self):
         return len(self.ct_images)
 
+# TODO: need to resize to 512, 512 and ToTensor
+
+# Transforms
+
+class ToTensor(object):
+    def __call__(self, x):
+        for data in x.keys():
+            x[data] = torch.from_numpy(x[data].copy())
+        return x
+
+
 if __name__=="__main__":
     # dataloader = CTDataLoader('data')
     # dataloader.split_data()
-    test_dataset = CTSliceDataset('test',mode='lung')
+    test_transform = transforms.Compose([ToTensor()])
+    test_dataset = CTSliceDataset('test', 512, transform=test_transform)
     test_dataloader = DataLoader(
-        test_dataset, batch_size=2, shuffle=False, num_workers=4, collate_fn=collate_fn
-    )
-    for ct_image, mask in test_dataloader:
-        continue
+        test_dataset, batch_size=4, shuffle=False, num_workers=4,) #collate_fn=collate_fn
+    for x in test_dataloader:
+        for data in x.keys():
+            print(data,'>>>')
+            print(x[data].size())
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
