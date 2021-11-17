@@ -101,18 +101,12 @@ class ResUnet(nn.Module):
 
         return output
 
-def get_lung_model(input_size=256, print_summary=True):
+def get_lung_model():
     model = ResUnet(in_channels=1, out_channels=2)
-    if print_summary:
-        print('Lung Model >>>')
-        summary(model,(1,input_size,input_size))
     return model
 
-def get_infection_model(input_size=256, print_summary=True):
+def get_infection_model():
     model = ResUnet(in_channels=3, out_channels=1)
-    if print_summary:
-        print('Infection Model >>>')
-        summary(model,(3,input_size,input_size))
     return model
 
 

@@ -1,5 +1,6 @@
 import os
-from skimage import transform
+from skimage.transform import resize
+from skimage import img_as_bool
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader, dataloader
 import torch.nn.functional as F
@@ -7,7 +8,6 @@ import nibabel as nib
 import pandas as pd 
 import matplotlib.pyplot as plt 
 from tqdm import tqdm
-from skimage.transform import resize
 
 
 from utils import *
@@ -45,7 +45,7 @@ class CTDataLoader():
                 new_value = row[key].replace('../input/covid19-ct-scans',self.data_path).replace('/',os.sep) 
                 self.metadata_df.iloc[idx] = row.replace([row[key]], new_value)
 
-    def split_data(self, train=0.8):
+    def split_data(self, train=0.8, val=0.1):
         '''
         Split all data into train/test
         Make sure even data of corona and radio image_types
@@ -61,8 +61,11 @@ class CTDataLoader():
             train_num = int(train*len(image_types[image_type]))
             for train_idx in image_types[image_type][:train_num]:
                 self.save_npy_slices(train_idx, 'train')
-            for test_idx in image_types[image_type][train_num:]:
-                self.save_npy_slices(test_idx, 'test')        
+            val_num = train_num+int(val*len(image_types[image_type]))
+            for val_idx in image_types[image_type][train_num:val_num]:
+                self.save_npy_slices(val_idx, 'val')  
+            for test_idx in image_types[image_type][val_num:]:
+                self.save_npy_slices(test_idx, 'test')          
 
     def save_npy_slices(self, idx, path):
         # NOTE: Renames masks with ct_scan name for convenience in CTSliceDataset
@@ -142,29 +145,32 @@ class CTSliceDataset(Dataset):
 
         # Load ct scan and resize
         ct_image = np.load(self.ct_images[idx])
-        ct_image = resize(ct_image, self.size, mode='reflect', preserve_range=True, anti_aliasing=True)
+        ct_image = resize(ct_image, self.size)
         ct_image = np.expand_dims(ct_image, axis=0)
-        ct_image = normalize(ct_image)
+        ct_image = normalize(ct_image).astype(np.float32)
 
-         # Get mask and resize
+        # Get mask
         mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
         mask = np.load(mask_id)
-        mask = resize(mask, self.size, mode='reflect', preserve_range=True, anti_aliasing=True)
 
         # 1-> RLung 2-> LLung 3 -> Infection
         # Lung mask 2xHxW
-        lung_mask = mask.copy()
-        lung_mask[mask == 3] = 0
-        lung_mask = np.stack([lung_mask,lung_mask],axis=0)
-        lung_mask[0][mask == 2] = 0
-        lung_mask[0][mask == 1] = 1
-        lung_mask[1][mask == 1] = 0
-        lung_mask[1][mask == 2] = 1
+        r_lung_mask = mask.copy()
+        r_lung_mask[mask > 1] = 0
+        l_lung_mask = r_lung_mask.copy()
+        l_lung_mask[mask == 1] = 0
+        l_lung_mask[mask == 2] = 1
         
+        # Resize lung masks and stack
+        r_lung_mask = img_as_bool(resize(r_lung_mask, self.size)).astype(np.float32)
+        l_lung_mask = img_as_bool(resize(l_lung_mask, self.size)).astype(np.float32)
+        lung_mask = np.stack([r_lung_mask,l_lung_mask],axis=0)
 
         # Infection mask 1xHxW
         inf_mask = mask.copy()
         inf_mask[mask < 3] = 0
+        inf_mask[mask == 3] = 1
+        inf_mask = img_as_bool(resize(inf_mask, self.size)).astype(np.float32)
         inf_mask = np.expand_dims(inf_mask, axis=0)
 
         x = {'ct_scan':ct_image,'lung':lung_mask,'inf':inf_mask,'id':image_type_id}
