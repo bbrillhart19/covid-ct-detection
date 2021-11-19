@@ -150,7 +150,6 @@ def main():
     print('Device:',lung_trainer.device)
     summary(lung_trainer.model,(1,IN_SIZE,IN_SIZE))
     
-
     # Set infection model to train
     infection_trainer = ModelTrainer(
         model = ResUnet(in_channels=3, out_channels=1),
