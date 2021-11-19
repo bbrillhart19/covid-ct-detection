@@ -100,16 +100,3 @@ class ResUnet(nn.Module):
         output = self.output_layer(x10)
 
         return output
-
-def get_lung_model():
-    model = ResUnet(in_channels=1, out_channels=2)
-    return model
-
-def get_infection_model():
-    model = ResUnet(in_channels=3, out_channels=1)
-    return model
-
-
-if __name__=="__main__":
-    test_lung_model = get_lung_model()
-    test_infection_model = get_infection_model()

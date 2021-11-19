@@ -13,6 +13,9 @@ from tqdm import tqdm
 from utils import *
 
 IMAGE_TYPES = ['corona','radio']
+R_LUNG = 1
+L_LUNG = 2
+INFECTION = 3
 
 def read_nii(filepath):
     '''
@@ -44,6 +47,11 @@ class CTDataLoader():
             for key in self.metadata_df.keys():
                 new_value = row[key].replace('../input/covid19-ct-scans',self.data_path).replace('/',os.sep) 
                 self.metadata_df.iloc[idx] = row.replace([row[key]], new_value)
+
+    def save_all(self, path):
+        '''Save All Data to path'''
+        for idx, row in self.metadata_df.iterrows():
+            self.save_npy_slices(idx, path)
 
     def split_data(self, train=0.8, val=0.1):
         '''
@@ -156,10 +164,11 @@ class CTSliceDataset(Dataset):
         # 1-> RLung 2-> LLung 3 -> Infection
         # Lung mask 2xHxW
         r_lung_mask = mask.copy()
-        r_lung_mask[mask > 1] = 0
+        r_lung_mask[mask != R_LUNG] = 0
+        r_lung_mask[mask == R_LUNG] = 1
         l_lung_mask = r_lung_mask.copy()
-        l_lung_mask[mask == 1] = 0
-        l_lung_mask[mask == 2] = 1
+        l_lung_mask[mask != L_LUNG] = 0
+        l_lung_mask[mask == L_LUNG] = 1
         
         # Resize lung masks and stack
         r_lung_mask = img_as_bool(resize(r_lung_mask, self.size)).astype(np.float32)
@@ -168,8 +177,8 @@ class CTSliceDataset(Dataset):
 
         # Infection mask 1xHxW
         inf_mask = mask.copy()
-        inf_mask[mask < 3] = 0
-        inf_mask[mask == 3] = 1
+        inf_mask[mask != INFECTION] = 0
+        inf_mask[mask == INFECTION] = 1
         inf_mask = img_as_bool(resize(inf_mask, self.size)).astype(np.float32)
         inf_mask = np.expand_dims(inf_mask, axis=0)
 
