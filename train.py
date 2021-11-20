@@ -12,7 +12,7 @@ from utils import *
 SPLIT_DATA = False
 IN_SIZE = 128
 DATA_PATH = 'data'
-BATCH_SIZE= 2
+BATCH_SIZE= 16
 LR = 0.0001
 PATIENCE = 1
 GPU = True
