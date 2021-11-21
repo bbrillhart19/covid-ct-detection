@@ -25,6 +25,8 @@ def save_loss(losses, folder, fn):
     path = os.path.join(ensure(folder),fn)
     plt.plot(losses['train'], label='Train Loss')
     plt.plot(losses['val'],label='Val Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
     plt.legend()
     plt.savefig(path)
     plt.close()

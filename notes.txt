@@ -1,0 +1,30 @@
+11-20-2021
+Baseline model: 
+CT Slice -> ResUnet -> R/L lung (2 channels) 
+    -> cat(CT Slice,R+L lungs) -> ResUnet -> Infection (1 channel)
+First train:
+- Max res: 128, max batch size: 8 (NVIDIA GeForce 1660 Super, 6GB)
+- Train lung first -> train infection model with best lung model in eval mode
+- Models overfit with no augmentations
+- Infection model overfit much worse/more quickly than lung model
+To do:
+- Lower patience value
+- Add augmentations:
+    - Vertical Flip (Horizontal would confuse L/R lung, could switch masks?)
+    - Rotation/Shear may help at some point, but will add a lot of code (need custom implementation for masks)
+    - Gaussian Blur -> same as above
+- Refine how results are output, include an experiment name, or auto and save configs?
+
+11-21-2021
+- Fixed environment.yml with --no-builds
+- Added Vertical Flip
+- Refined result output for training, added exp_name as 'baseline'
+- lowered patience 25 -> 10
+Second Train:
+- w/ vertical flip, models were somewhat better
+- Infection model still overfitting, though not as bad as w/o augs 
+To Do:
+- Add rotation augmentations
+- Possibly add dropout layers to model (where to do this?)
+- Need to add min losses to title of loss result outputs
+

@@ -1,11 +1,12 @@
 import os
 import torch
 import torch.nn as nn
+from torchvision import transforms as T
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchsummary import summary
 from tqdm import tqdm
-from data import CTDataLoader, CTSliceDataset
+from data import *
 from model import ResUnet
 from utils import *
 
@@ -14,12 +15,13 @@ IN_SIZE = 128
 DATA_PATH = 'data'
 BATCH_SIZE = 8
 LR = 0.0001
-PATIENCE = 25
+PATIENCE = 10
 GPU = True
-MODEL_LOGS = ensure(os.path.join('model_logs'))
+EXP_NAME = 'baseline'
+MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
 FROM_SAVE = {'lung':False,'inf':False}
-RESULTS_FOLDER = 'train_results'
+RESULTS_FOLDER = ensure(os.path.join('results','train',EXP_NAME))
 
 class ModelTrainer():
     def __init__(self, model, device, ckpt_path, criterion=None, optim=None, optim_args=None, lr_sched=None, lr_sched_args=None):
@@ -138,7 +140,7 @@ def train_lung_model(lung_trainer, train_dataloader, val_dataloader):
             patience += 1
         print('Patience:',patience,'Remaining:',PATIENCE-patience)
 
-        save_loss(losses, os.path.join(RESULTS_FOLDER,'losses'), 'lung_model_train_loss.png')
+        save_loss(losses, os.path.join(RESULTS_FOLDER,'losses'), 'lung_model.png')
 
 def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader):
     epoch = 0
@@ -208,7 +210,7 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
             patience += 1
         print('Patience:',patience,'Remaining:',PATIENCE-patience)
 
-        save_loss(losses, os.path.join(RESULTS_FOLDER,'losses'), 'infection_model_train_loss.png')
+        save_loss(losses, os.path.join(RESULTS_FOLDER,'losses'), 'infection_model.png')
 
 def main():
     # Split data to train, val, test if desired
@@ -217,7 +219,7 @@ def main():
         ct_dataloader.split_data()
 
     # Get train dataloader #TODO: Transforms
-    train_dataset = CTSliceDataset('train', IN_SIZE, transform=None)
+    train_dataset = CTSliceDataset('train', IN_SIZE, transform=T.Compose([RandomVerticalFlip(0.4)]))
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
     # Get val dataloader

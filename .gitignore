@@ -3,7 +3,7 @@ data/
 test/
 train/
 val/
-train_results/
+results/
 model_logs/
 .DS_Store
 

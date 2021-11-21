@@ -1,7 +1,7 @@
 import os
 from skimage.transform import resize
 from skimage import img_as_bool
-from torchvision import transforms
+from torchvision import transforms as T
 from torch.utils.data import Dataset, DataLoader, dataloader
 import torch.nn.functional as F
 import nibabel as nib 
@@ -160,13 +160,13 @@ class CTSliceDataset(Dataset):
         # Get mask
         mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
         mask = np.load(mask_id)
-
+ 
         # 1-> RLung 2-> LLung 3 -> Infection
         # Lung mask 2xHxW
         r_lung_mask = mask.copy()
         r_lung_mask[mask != R_LUNG] = 0
         r_lung_mask[mask == R_LUNG] = 1
-        l_lung_mask = r_lung_mask.copy()
+        l_lung_mask = mask.copy()
         l_lung_mask[mask != L_LUNG] = 0
         l_lung_mask[mask == L_LUNG] = 1
         
@@ -193,7 +193,18 @@ class CTSliceDataset(Dataset):
         return len(self.ct_images)
 
 # Transforms
-
+class RandomVerticalFlip(object):
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, x):
+        if np.random.rand() <= self.p:
+            for img in x.keys():
+                if img == 'id':
+                    continue
+                for c in range(x[img].shape[0]):
+                    x[img][c] = np.flipud(x[img][c])        
+        return x
+    
 # Distribution utilities
 def calculate_mean_offset(base_image_type='corona'):
     image_types = {image_type:[] for image_type in IMAGE_TYPES}
@@ -214,19 +225,36 @@ def calculate_mean_offset(base_image_type='corona'):
             print(dataset_type,image_type,'total:',total)
             print(dataset_type,image_type,'mean:',mean)
 
+# Visualization
+def display_sample(batch):
+    batch_size = batch['ct_scan'].size()[0]
+    ct_images = batch['ct_scan']
+    lung_masks = batch['lung']
+    inf_masks = batch['inf']
+    fig, axes = plt.subplots(batch_size, batch_size, figsize=(16,10))
+    for i, ax in enumerate(axes.flatten()):
+        # First Row ct_image
+        if i < batch_size:
+            ax.imshow(ct_images[i,0],cmap='bone')
+        elif i < batch_size*2:
+            ax.imshow(lung_masks[i%batch_size,0],cmap='gray')
+        elif i < batch_size*3:
+            ax.imshow(lung_masks[i%batch_size,1],cmap='gray')
+        else:
+            ax.imshow(inf_masks[i%batch_size,0],cmap='gray')
+    plt.show()
+
+
 if __name__=="__main__":
-    calculate_mean_offset()
+    # calculate_mean_offset()
     # dataloader = CTDataLoader('data')
     # dataloader.split_data()
-    # test_transform = transforms.Compose([ToTensor()])
-    # test_dataset = CTSliceDataset('test', 256, transform=test_transform)
-    # test_dataloader = DataLoader(
-    #     test_dataset, batch_size=4, shuffle=False, num_workers=4,) #collate_fn=collate_fn
-    # for x in test_dataloader:
-    #     continue
-        # for data in x.keys():
-        #     print(data,'>>>')
-        #     print(x[data].size())
+    test_transform = T.Compose([RandomVerticalFlip(0.8)])
+    test_dataset = CTSliceDataset('test', 128, transform=test_transform)
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=4, shuffle=True, num_workers=4,) #collate_fn=collate_fn
+    for x in test_dataloader:
+        display_sample(x)
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
