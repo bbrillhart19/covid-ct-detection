@@ -1,7 +1,8 @@
 import os
 from skimage.transform import resize
 from skimage import img_as_bool
-from torchvision import transforms as T
+import torchvision.transforms as T
+import torchvision.transforms.functional as F_t
 from torch.utils.data import Dataset, DataLoader, dataloader
 import torch.nn.functional as F
 import nibabel as nib 
@@ -193,6 +194,15 @@ class CTSliceDataset(Dataset):
         return len(self.ct_images)
 
 # Transforms
+class ToTensor(object):
+    def __call__(self, x):
+        for img in x.keys():
+            if img == 'id':
+                x[img] = torch.as_tensor(x[img])
+            else:
+                x[img] = torch.from_numpy(x[img])
+        return x
+
 class RandomVerticalFlip(object):
     def __init__(self, p):
         self.p = p
@@ -201,8 +211,20 @@ class RandomVerticalFlip(object):
             for img in x.keys():
                 if img == 'id':
                     continue
-                for c in range(x[img].shape[0]):
-                    x[img][c] = np.flipud(x[img][c])        
+                for c in range(x[img].size()[0]):
+                    x[img][c] = F_t.vflip(x[img][c])        
+        return x
+
+class RandomRotate(object):
+    def __init__(self, p, range):
+        self.p = p
+        self.range = np.linspace(-range,range,range//5)
+    def __call__(self, x):
+        if np.random.rand() <= self.p:
+            for img in x.keys():                
+                if img == 'id':
+                    continue
+                x[img] = F_t.rotate(x[img],np.random.choice(self.range))
         return x
     
 # Distribution utilities
@@ -227,33 +249,40 @@ def calculate_mean_offset(base_image_type='corona'):
 
 # Visualization
 def display_sample(batch):
-    batch_size = batch['ct_scan'].size()[0]
+    # batch_size = batch['ct_scan'].size()[0]
     ct_images = batch['ct_scan']
     lung_masks = batch['lung']
     inf_masks = batch['inf']
-    fig, axes = plt.subplots(batch_size, batch_size, figsize=(16,10))
+    fig, axes = plt.subplots(4, 4, figsize=(16,10))
     for i, ax in enumerate(axes.flatten()):
         # First Row ct_image
-        if i < batch_size:
-            ax.imshow(ct_images[i,0],cmap='bone')
-        elif i < batch_size*2:
-            ax.imshow(lung_masks[i%batch_size,0],cmap='gray')
-        elif i < batch_size*3:
-            ax.imshow(lung_masks[i%batch_size,1],cmap='gray')
+        if i < 4:
+            ax.imshow(ct_images[i%4,0],cmap='bone')
+        elif i < 8:
+            ax.imshow(lung_masks[i%4,0],cmap='gray')
+        elif i < 12:
+            ax.imshow(lung_masks[i%4,1],cmap='gray')
         else:
-            ax.imshow(inf_masks[i%batch_size,0],cmap='gray')
+            ax.imshow(inf_masks[i%4,0],cmap='gray')
     plt.show()
 
+# def collate_fn(batch):
+#     return tuple(zip(*batch))
 
 if __name__=="__main__":
     # calculate_mean_offset()
     # dataloader = CTDataLoader('data')
     # dataloader.split_data()
-    test_transform = T.Compose([RandomVerticalFlip(0.8)])
-    test_dataset = CTSliceDataset('test', 128, transform=test_transform)
+    test_transform = T.Compose([
+        ToTensor(),
+        RandomVerticalFlip(0.4),
+        RandomRotate(0.4,30)
+    ])
+    test_dataset = CTSliceDataset('train', 128, transform=test_transform)
     test_dataloader = DataLoader(
-        test_dataset, batch_size=4, shuffle=True, num_workers=4,) #collate_fn=collate_fn
-    for x in test_dataloader:
+        test_dataset, batch_size=4, shuffle=True, num_workers=4,)
+    for x in tqdm(test_dataloader):
+        # continue
         display_sample(x)
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():

@@ -17,7 +17,7 @@ BATCH_SIZE = 8
 LR = 0.0001
 PATIENCE = 10
 GPU = True
-EXP_NAME = 'baseline'
+EXP_NAME = 'flip_rotate_augs'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
 FROM_SAVE = {'lung':False,'inf':False}
@@ -219,7 +219,12 @@ def main():
         ct_dataloader.split_data()
 
     # Get train dataloader #TODO: Transforms
-    train_dataset = CTSliceDataset('train', IN_SIZE, transform=T.Compose([RandomVerticalFlip(0.4)]))
+    aug_transform = T.Compose([
+        ToTensor(),
+        RandomVerticalFlip(0.4),
+        RandomRotate(0.4, 30)
+    ])
+    train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
     # Get val dataloader
