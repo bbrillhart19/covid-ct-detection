@@ -221,10 +221,11 @@ class RandomRotate(object):
         self.range = np.linspace(-range,range,range//5)
     def __call__(self, x):
         if np.random.rand() <= self.p:
+            angle = np.random.choice(self.range)
             for img in x.keys():                
                 if img == 'id':
                     continue
-                x[img] = F_t.rotate(x[img],np.random.choice(self.range))
+                x[img] = F_t.rotate(x[img],angle)
         return x
     
 # Distribution utilities
@@ -276,7 +277,7 @@ if __name__=="__main__":
     test_transform = T.Compose([
         ToTensor(),
         RandomVerticalFlip(0.4),
-        RandomRotate(0.4,30)
+        RandomRotate(0.7,30)
     ])
     test_dataset = CTSliceDataset('train', 128, transform=test_transform)
     test_dataloader = DataLoader(
