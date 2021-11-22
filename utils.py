@@ -27,7 +27,7 @@ def save_loss(losses, folder, fn):
     min_val_loss = round(min(losses['val']),5)
     plt.plot(losses['train'], label='Train Loss')
     plt.plot(losses['val'],label='Val Loss')
-    plt.title('Min Train Loss:',min_train_loss,'\nMin Val Loss:',min_val_loss)
+    plt.title('Min Train Loss: '+str(min_train_loss)+'\nMin Val Loss: '+str(min_val_loss))
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()

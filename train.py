@@ -20,7 +20,7 @@ GPU = True
 EXP_NAME = 'flip_rotate_augs'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
-FROM_SAVE = {'lung':False,'inf':False}
+FROM_SAVE = {'lung':True,'inf':False}
 RESULTS_FOLDER = ensure(os.path.join('results','train',EXP_NAME))
 
 class ModelTrainer():
@@ -225,11 +225,11 @@ def main():
         RandomRotate(0.4, 30)
     ])
     train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform)
-    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
     # Get val dataloader
     val_dataset = CTSliceDataset('val', IN_SIZE, transform=None)
-    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8)
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
     # Set lung model to train
     lung_trainer = ModelTrainer(
