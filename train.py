@@ -20,7 +20,7 @@ GPU = True
 EXP_NAME = 'flip_rotate_augs'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
-FROM_SAVE = {'lung':True,'inf':False}
+FROM_SAVE = {'lung':False,'inf':False}
 RESULTS_FOLDER = ensure(os.path.join('results','train',EXP_NAME))
 
 class ModelTrainer():
