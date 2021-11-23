@@ -28,7 +28,8 @@ To Do:
 - Possibly add dropout layers to model (where to do this?)
 - Need to add min losses to title of loss result outputs
 Third Train:
-- Adding rotations improved slightly, infection model still overfitting
+- Adding rotations improved slightly, infection model still overfitting a bit
 - May be good to try infection model without lungs for comparison
-To Do:
-- Write test script with samples and results
+
+11-22-2021
+- Attempting train with infection model w/o lungs, single channel input of image
