@@ -13,7 +13,7 @@ from utils import *
 SPLIT_DATA = False
 IN_SIZE = 128
 DATA_PATH = 'data'
-BATCH_SIZE = 8
+BATCH_SIZE = 1
 LR = 0.0001
 PATIENCE = 25
 GPU = True
@@ -58,8 +58,7 @@ class ModelTrainer():
             optim_state_dict = self.optim.state_dict(),
             lr_state_dict = self.lr_sched.state_dict(),
             epoch = epoch,
-            loss = loss,
-            metrics = metrics
+            loss = loss
         )
         torch.save(checkpoint, self.ckpt_path)
         print('Saved',self.ckpt_path)
@@ -239,6 +238,42 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
 
         save_loss(losses, os.path.join(RESULTS_FOLDER,'losses'), 'infection_model.png')
 
+def eval_models(lung_trainer, infection_trainer, val_dataloader, save_samples=True):
+    lung_trainer.load_checkpoint()
+    infection_trainer.load_checkpoint()
+    for val_data in tqdm(val_dataloader,desc='Evaluating'):
+        ct_image, lung_mask, inf_mask, image_type = \
+                val_data['ct_scan'], val_data['lung'], val_data['inf'], val_data['id']
+            
+        # Get pred from lung model
+        ct_image = ct_image.to(lung_trainer.device)
+        lung_pred = lung_trainer.val_step(ct_image, lung_mask)
+
+        # Stack ct_image with lung pred for infection model input
+        ct_image = ct_image.detach().cpu()
+        lung_pred = lung_pred.detach().cpu()
+        inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+        
+        # Val step on batch
+        ct_image = ct_image.to(infection_trainer.device)
+        inf_mask = inf_mask.to(infection_trainer.device)
+        inf_pred = infection_trainer.val_step(inf_input, inf_mask)
+            
+    # Output test results
+    val_loss = lung_trainer.get_val_loss()
+    print('Lung Loss:',val_loss)
+    metrics = lung_trainer.get_metric_scores()
+    print('Metrics >>>')
+    for score in metrics.keys():
+        print('['+score+']',metrics[score])
+
+    val_loss = infection_trainer.get_val_loss()
+    print('Inf Loss:',val_loss)
+    metrics = infection_trainer.get_metric_scores()
+    print('Metrics >>>')
+    for score in metrics.keys():
+        print('['+score+']',metrics[score])
+
 def main():
     # Split data to train, val, test if desired
     if SPLIT_DATA:
@@ -256,7 +291,7 @@ def main():
 
     # Get val dataloader
     val_dataset = CTSliceDataset('val', IN_SIZE, transform=None)
-    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=1)
 
     # Set lung model to train    
     lung_trainer = ModelTrainer(
@@ -276,10 +311,10 @@ def main():
     summary(lung_trainer.model,(1,IN_SIZE,IN_SIZE))
 
     # Train lung model
-    train_lung_model(lung_trainer, train_dataloader, val_dataloader)
+    # train_lung_model(lung_trainer, train_dataloader, val_dataloader)
 
     # Load best lung model from checkpoint
-    lung_trainer.load_checkpoint()
+    # lung_trainer.load_checkpoint()
     
     # Set infection model to train
     infection_trainer = ModelTrainer(
@@ -299,7 +334,8 @@ def main():
     summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
 
     # Train Infection model
-    train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
+    # train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
+    eval_models(lung_trainer, infection_trainer, val_dataloader)
 
 if __name__=="__main__":
     main()
