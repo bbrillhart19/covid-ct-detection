@@ -235,7 +235,7 @@ class RandomRot90(object):
             for img in x.keys():
                 if img == 'id':
                     continue
-                x[img] = F_t.rotate(x[img],90)
+                x[img] = torch.rot90(x[img])
 
 class RandomRotate(object):
     def __init__(self, p, range):
