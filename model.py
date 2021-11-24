@@ -1,4 +1,3 @@
-from matplotlib.pyplot import summer
 import torch
 import torch.nn as nn
 from torchsummary import summary

@@ -3,7 +3,7 @@ from skimage.transform import resize
 from skimage import img_as_bool
 import torchvision.transforms as T
 import torchvision.transforms.functional as F_t
-from torch.utils.data import Dataset, DataLoader, dataloader
+from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 import nibabel as nib 
 import pandas as pd 
