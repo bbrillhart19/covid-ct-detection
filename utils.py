@@ -46,8 +46,8 @@ class BinaryMetrics():
         self.activation = activation
 
     def get_metrics(self, gt, pred):
-        output = pred.view(-1, )
-        target = gt.view(-1, ).float()
+        output = pred.detach().cpu().view(-1, )
+        target = gt.detach().cpu().view(-1, ).float()
 
         tp = torch.sum(output * target)  # TP
         fp = torch.sum(output * (1 - target))  # FP
