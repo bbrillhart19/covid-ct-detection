@@ -3,7 +3,7 @@ from skimage.transform import resize
 from skimage import img_as_bool
 import torchvision.transforms as T
 import torchvision.transforms.functional as F_t
-from torch.utils.data import Dataset, DataLoader, dataloader
+from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 import nibabel as nib 
 import pandas as pd 
@@ -207,13 +207,35 @@ class RandomVerticalFlip(object):
     def __init__(self, p):
         self.p = p
     def __call__(self, x):
-        if np.random.rand() <= self.p:
+        if torch.rand(1) < self.p:
             for img in x.keys():
                 if img == 'id':
                     continue
                 for c in range(x[img].size()[0]):
                     x[img][c] = F_t.vflip(x[img][c])        
         return x
+
+class RandomHorizontalFlip(object):
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, x):
+        if torch.rand(1) < self.p:
+            for img in x.keys():
+                if img == 'id':
+                    continue
+                for c in range(x[img].size()[0]):
+                    x[img][c] = F_t.hflip(x[img][c])
+        return x
+
+class RandomRot90(object):
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, x):
+        if torch.rand(1) < self.p:
+            for img in x.keys():
+                if img == 'id':
+                    continue
+                x[img] = torch.rot90(x[img])
 
 class RandomRotate(object):
     def __init__(self, p, range):
@@ -292,6 +314,3 @@ if __name__=="__main__":
     #     print(data0.shape)
     #     print('Max:',torch.max(data0),'Min:',torch.min(data0))
     # dataloader.display_all(11,100)
-
-
-

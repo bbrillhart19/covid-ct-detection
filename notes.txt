@@ -32,4 +32,11 @@ Third Train:
 - May be good to try infection model without lungs for comparison
 
 11-22-2021
+Current Metrics (flip_rotate-aug)
 - Attempting train with infection model w/o lungs, single channel input of image
+Fourth Train:
+- Overfit worse w/o lungs, metrics show inf model is not predicting infected areas due to small size
+- Cropping and zoom would be too inconsistent
+- need to train with full lung masks, was using lungs w/o infected areas, may help
+- Train for lungs on single channel, segment both instead of L/R, simplifies and allows for more augmentations such as horizontal flip and 90 deg rotate. Should tone down rotation chance, may be too high and affecting training
+- Try 2 channel output, single model with lungs/inf?

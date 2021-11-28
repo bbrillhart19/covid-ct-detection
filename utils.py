@@ -34,6 +34,11 @@ def save_loss(losses, folder, fn):
     plt.savefig(path)
     plt.close()
 
+def save_metrics(metrics, folder, fn):
+    path = os.path.join(ensure(folder), fn)
+    
+
+
 class BinaryMetrics():
     r"""Calculate common metrics in binary cases.
     In binary cases it should be noted that y_pred shape shall be like (N, 1, H, W), or an assertion 
