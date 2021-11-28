@@ -13,14 +13,15 @@ from utils import *
 SPLIT_DATA = False
 IN_SIZE = 128
 DATA_PATH = 'data'
-BATCH_SIZE = 1
+BATCH_SIZE = 8
 LR = 0.0001
 PATIENCE = 10
 GPU = True
-EXP_NAME = 'flip_rotate_augs_wmetrics'
+EXP_NAME = 'flip_rotate_augs'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
 FROM_SAVE = {'lung':False,'inf':False}
+TRAIN = {'lung':False,'inf':False}
 RESULTS_FOLDER = ensure(os.path.join('results','train',EXP_NAME))
 
 class ModelTrainer():
@@ -238,7 +239,7 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
 
         save_loss(losses, os.path.join(RESULTS_FOLDER,'losses'), 'infection_model.png')
 
-def eval_models(lung_trainer, infection_trainer, val_dataloader, save_samples=True):
+def eval_models(lung_trainer, infection_trainer, val_dataloader):
     lung_trainer.load_checkpoint()
     infection_trainer.load_checkpoint()
     for val_data in tqdm(val_dataloader,desc='Evaluating'):
@@ -247,6 +248,7 @@ def eval_models(lung_trainer, infection_trainer, val_dataloader, save_samples=Tr
             
         # Get pred from lung model
         ct_image = ct_image.to(lung_trainer.device)
+        lung_mask = lung_mask.to(lung_trainer.device)
         lung_pred = lung_trainer.val_step(ct_image, lung_mask)
 
         # Stack ct_image with lung pred for infection model input
@@ -258,6 +260,16 @@ def eval_models(lung_trainer, infection_trainer, val_dataloader, save_samples=Tr
         ct_image = ct_image.to(infection_trainer.device)
         inf_mask = inf_mask.to(infection_trainer.device)
         inf_pred = infection_trainer.val_step(inf_input, inf_mask)
+
+        save_sample(
+            ct_image.detach().cpu().numpy(),
+            lung_mask.detach().cpu().numpy(),
+            lung_pred.detach().cpu().numpy(),
+            inf_mask.detach().cpu().numpy(),
+            inf_pred.detach().cpu().numpy(),
+            os.path.join(RESULTS_FOLDER,'samples'),
+            num_samples=ct_image.size()[0]
+        )
             
     # Output test results
     val_loss = lung_trainer.get_val_loss()
@@ -266,6 +278,7 @@ def eval_models(lung_trainer, infection_trainer, val_dataloader, save_samples=Tr
     print('Metrics >>>')
     for score in metrics.keys():
         print('['+score+']',metrics[score])
+    save_metrics(metrics, os.path.join(RESULTS_FOLDER,'metrics'), 'lung_model.png')
 
     val_loss = infection_trainer.get_val_loss()
     print('Inf Loss:',val_loss)
@@ -273,23 +286,7 @@ def eval_models(lung_trainer, infection_trainer, val_dataloader, save_samples=Tr
     print('Metrics >>>')
     for score in metrics.keys():
         print('['+score+']',metrics[score])
-
-def temp_eval_lung(lung_trainer, val_dataloader):
-    lung_trainer.load_checkpoint()
-    for val_data in tqdm(val_dataloader,desc='Evaluating'):
-        ct_image, lung_mask, image_type = \
-                val_data['ct_scan'], val_data['lung'], val_data['id']
-
-        # Get pred from lung model
-        ct_image = ct_image.to(lung_trainer.device)
-        lung_pred = lung_trainer.val_step(ct_image, lung_mask)
-    # Output test results
-    val_loss = lung_trainer.get_val_loss()
-    print('Lung Loss:',val_loss)
-    metrics = lung_trainer.get_metric_scores()
-    print('Metrics >>>')
-    for score in metrics.keys():
-        print('['+score+']',metrics[score])
+    save_metrics(metrics, os.path.join(RESULTS_FOLDER,'metrics'), 'infection_model.png')
 
 def main():
     # Split data to train, val, test if desired
@@ -298,18 +295,18 @@ def main():
         ct_dataloader.split_data()
 
     # Get train dataloader #TODO: Transforms
-    # aug_transform = T.Compose([
-    #     ToTensor(),
-    #     RandomVerticalFlip(0.4),
-    #     RandomRotate(0.4, 30)
-    # ])
-    # train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform)
-    # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+    aug_transform = T.Compose([
+        ToTensor(),
+        RandomVerticalFlip(0.4),
+        RandomRotate(0.4, 30)
+    ])
+    train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform)
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
     # Get val dataloader
     transform = T.Compose([ToTensor()])
     val_dataset = CTSliceDataset('val', IN_SIZE, transform=transform)
-    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=1)
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
     # Set lung model to train    
     lung_trainer = ModelTrainer(
@@ -332,29 +329,28 @@ def main():
     # train_lung_model(lung_trainer, train_dataloader, val_dataloader)
 
     # Load best lung model from checkpoint
-    # lung_trainer.load_checkpoint()
+    lung_trainer.load_checkpoint()
     
     # Set infection model to train
-    # infection_trainer = ModelTrainer(
-    #     model = ResUnet(in_channels=2, out_channels=1),
-    #     device = get_default_device(gpu=GPU),
-    #     ckpt_path=MODEL_CKPTS['inf'],
-    #     metrics = BinaryMetrics(),
-    #     criterion = nn.BCELoss(reduction='mean'),
-    #     optim = torch.optim.Adam,
-    #     optim_args = dict(lr=LR),
-    #     lr_sched = torch.optim.lr_scheduler.StepLR,
-    #     lr_sched_args = dict(step_size=20,gamma=0.1),
-    # )
+    infection_trainer = ModelTrainer(
+        model = ResUnet(in_channels=2, out_channels=1),
+        device = get_default_device(gpu=GPU),
+        ckpt_path=MODEL_CKPTS['inf'],
+        metrics = BinaryMetrics(),
+        criterion = nn.BCELoss(reduction='mean'),
+        optim = torch.optim.Adam,
+        optim_args = dict(lr=LR),
+        lr_sched = torch.optim.lr_scheduler.StepLR,
+        lr_sched_args = dict(step_size=20,gamma=0.1),
+    )
 
-    # print('Infection Model >>>')
-    # print('Device:',infection_trainer.device)
-    # summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
+    print('Infection Model >>>')
+    print('Device:',infection_trainer.device)
+    summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
 
     # Train Infection model
     # train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
-    # eval_models(lung_trainer, infection_trainer, val_dataloader)
-    temp_eval_lung(lung_trainer, val_dataloader)
+    eval_models(lung_trainer, infection_trainer, val_dataloader)
 
 if __name__=="__main__":
     main()

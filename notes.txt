@@ -40,3 +40,7 @@ Fourth Train:
 - need to train with full lung masks, was using lungs w/o infected areas, may help
 - Train for lungs on single channel, segment both instead of L/R, simplifies and allows for more augmentations such as horizontal flip and 90 deg rotate. Should tone down rotation chance, may be too high and affecting training
 - Try 2 channel output, single model with lungs/inf?
+
+11-28-21
+- Adding validation visuals (finally) for metrics and sample visuals
+- Infection Model is actually not terrible, it seems to overfit to the less confident lung areas, using full lung masks to train lung model should fix
