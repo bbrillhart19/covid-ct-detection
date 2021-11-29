@@ -331,7 +331,7 @@ def main():
     summary(lung_trainer.model,(1,IN_SIZE,IN_SIZE))
 
     # Train lung model
-    train_lung_model(lung_trainer, train_dataloader, val_dataloader)
+    # train_lung_model(lung_trainer, train_dataloader, val_dataloader)
 
     # Load best lung model from checkpoint
     lung_trainer.load_checkpoint()
@@ -354,7 +354,7 @@ def main():
     summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
 
     # Train Infection model
-    train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
+    # train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
     eval_models(lung_trainer, infection_trainer, val_dataloader)
 
 if __name__=="__main__":

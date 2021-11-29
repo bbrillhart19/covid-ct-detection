@@ -34,8 +34,8 @@ def save_sample(ct_image, lung_mask, lung_pred, inf_mask, inf_pred, folder, num_
         ax.imshow(ct_image[i%num_samples,0],cmap='bone')
         if row == 2:
             ax.set_title('Lung')
-            ax.imshow(lung_mask[i%num_samples,0]+lung_mask[i%num_samples,1],cmap='binary',alpha=0.5,vmin=0,vmax=1)
-            ax.imshow(lung_pred[i%num_samples,0]+lung_pred[i%num_samples,1],cmap='jet',alpha=0.3,vmin=0,vmax=1)
+            ax.imshow(lung_mask[i%num_samples,0],cmap='binary',alpha=0.5,vmin=0,vmax=1)
+            ax.imshow(lung_pred[i%num_samples,0],cmap='jet',alpha=0.3,vmin=0,vmax=1)
         elif row == 3:
             ax.set_title('Infection')
             ax.imshow(inf_mask[i%num_samples,0],cmap='binary',alpha=0.4,vmin=0,vmax=1)
