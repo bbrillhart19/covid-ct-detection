@@ -17,11 +17,11 @@ BATCH_SIZE = 8
 LR = 0.0001
 PATIENCE = 10
 GPU = True
-EXP_NAME = 'flip_rotate_augs'
+EXP_NAME = 'single_channel_lung'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
 FROM_SAVE = {'lung':False,'inf':False}
-TRAIN = {'lung':False,'inf':False}
+# TRAIN = {'lung':False,'inf':False}
 RESULTS_FOLDER = ensure(os.path.join('results','train',EXP_NAME))
 
 class ModelTrainer():
@@ -183,9 +183,10 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
             lung_pred = lung_trainer.val_step(ct_image, None)
 
             # Stack ct_image with lung pred for infection model input
-            ct_image = ct_image.detach().cpu()
-            lung_pred = lung_pred.detach().cpu()
-            inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+            # ct_image = ct_image.detach().cpu()
+            # lung_pred = lung_pred.detach().cpu()
+            # inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+            inf_input = torch.concat([ct_image,lung_pred],dim=1).to(infection_trainer.device)
             
             # Train step on batch
             ct_image = ct_image.to(infection_trainer.device)
@@ -210,9 +211,10 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
             lung_pred = lung_trainer.val_step(ct_image, None)
 
             # Stack ct_image with lung pred for infection model input
-            ct_image = ct_image.detach().cpu()
-            lung_pred = lung_pred.detach().cpu()
-            inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+            # ct_image = ct_image.detach().cpu()
+            # lung_pred = lung_pred.detach().cpu()
+            # inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+            inf_input = torch.concat([ct_image,lung_pred],dim=1).to(infection_trainer.device)
             
             # Val step on batch
             ct_image = ct_image.to(infection_trainer.device)
@@ -252,9 +254,10 @@ def eval_models(lung_trainer, infection_trainer, val_dataloader):
         lung_pred = lung_trainer.val_step(ct_image, lung_mask)
 
         # Stack ct_image with lung pred for infection model input
-        ct_image = ct_image.detach().cpu()
-        lung_pred = lung_pred.detach().cpu()
-        inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+        # ct_image = ct_image.detach().cpu()
+        # lung_pred = lung_pred.detach().cpu()
+        # inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
+        inf_input = torch.concat([ct_image,lung_pred],dim=1).to(infection_trainer.device)
         
         # Val step on batch
         ct_image = ct_image.to(infection_trainer.device)
@@ -298,7 +301,9 @@ def main():
     aug_transform = T.Compose([
         ToTensor(),
         RandomVerticalFlip(0.4),
-        RandomRotate(0.4, 30)
+        RandomHorizontalFlip(0.4),
+        RandomRot90(0.2),
+        RandomRotate(0.3, 30)
     ])
     train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
@@ -310,7 +315,7 @@ def main():
 
     # Set lung model to train    
     lung_trainer = ModelTrainer(
-        model = ResUnet(in_channels=1, out_channels=2),
+        model = ResUnet(in_channels=1, out_channels=1),
         device = get_default_device(gpu=GPU),
         ckpt_path=MODEL_CKPTS['lung'],
         metrics = BinaryMetrics(),
@@ -326,7 +331,7 @@ def main():
     summary(lung_trainer.model,(1,IN_SIZE,IN_SIZE))
 
     # Train lung model
-    # train_lung_model(lung_trainer, train_dataloader, val_dataloader)
+    train_lung_model(lung_trainer, train_dataloader, val_dataloader)
 
     # Load best lung model from checkpoint
     lung_trainer.load_checkpoint()
@@ -349,7 +354,7 @@ def main():
     summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
 
     # Train Infection model
-    # train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
+    train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
     eval_models(lung_trainer, infection_trainer, val_dataloader)
 
 if __name__=="__main__":

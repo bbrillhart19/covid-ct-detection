@@ -87,12 +87,6 @@ def save_metrics(metrics, folder, fn):
 
 
 class BinaryMetrics():
-    r"""Calculate common metrics in binary cases.
-    In binary cases it should be noted that y_pred shape shall be like (N, 1, H, W), or an assertion 
-    error will be raised.
-    Also this calculator provides the function to calculate specificity, also known as true negative 
-    rate, as specificity/TPR is meaningless in multiclass cases.
-    """
     def __init__(self, eps=1e-5):
         self.eps = eps
 

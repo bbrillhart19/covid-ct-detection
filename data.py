@@ -158,28 +158,37 @@ class CTSliceDataset(Dataset):
         ct_image = np.expand_dims(ct_image, axis=0)
         ct_image = normalize(ct_image).astype(np.float32)
 
-        # Get mask
-        mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
-        mask = np.load(mask_id)
+        # Get lung mask
+        # mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
+        # mask = np.load(mask_id)
+        lung_mask_id = self.ct_images[idx].replace('ct_scan','lung_mask')
+        lung_mask = np.load(lung_mask_id)
  
         # 1-> RLung 2-> LLung 3 -> Infection
         # Lung mask 2xHxW
-        r_lung_mask = mask.copy()
-        r_lung_mask[mask != R_LUNG] = 0
-        r_lung_mask[mask == R_LUNG] = 1
-        l_lung_mask = mask.copy()
-        l_lung_mask[mask != L_LUNG] = 0
-        l_lung_mask[mask == L_LUNG] = 1
+        # r_lung_mask = mask.copy()
+        # r_lung_mask[mask != R_LUNG] = 0
+        # r_lung_mask[mask == R_LUNG] = 1
+        # l_lung_mask = mask.copy()
+        # l_lung_mask[mask != L_LUNG] = 0
+        # l_lung_mask[mask == L_LUNG] = 1
+        lung_mask[lung_mask != 0] = 1
         
         # Resize lung masks and stack
-        r_lung_mask = img_as_bool(resize(r_lung_mask, self.size)).astype(np.float32)
-        l_lung_mask = img_as_bool(resize(l_lung_mask, self.size)).astype(np.float32)
-        lung_mask = np.stack([r_lung_mask,l_lung_mask],axis=0)
+        # r_lung_mask = img_as_bool(resize(r_lung_mask, self.size)).astype(np.float32)
+        # l_lung_mask = img_as_bool(resize(l_lung_mask, self.size)).astype(np.float32)
+        # lung_mask = np.stack([r_lung_mask,l_lung_mask],axis=0)
+        lung_mask = img_as_bool(resize(lung_mask, self.size)).astype(np.float32)
+        lung_mask = np.expand_dims(lung_mask, axis=0)
 
-        # Infection mask 1xHxW
-        inf_mask = mask.copy()
-        inf_mask[mask != INFECTION] = 0
-        inf_mask[mask == INFECTION] = 1
+        # Get Infection Mask
+        inf_mask_id = self.ct_images[idx].replace('ct_scan','infection_mask')
+        inf_mask = np.load(inf_mask_id)
+
+        # Infection mask 1xHxW        
+        # inf_mask = mask.copy()
+        # inf_mask[mask != INFECTION] = 0
+        # inf_mask[mask == INFECTION] = 1
         inf_mask = img_as_bool(resize(inf_mask, self.size)).astype(np.float32)
         inf_mask = np.expand_dims(inf_mask, axis=0)
 
@@ -211,8 +220,7 @@ class RandomVerticalFlip(object):
             for img in x.keys():
                 if img == 'id':
                     continue
-                for c in range(x[img].size()[0]):
-                    x[img][c] = F_t.vflip(x[img][c])        
+                x[img] = F_t.vflip(x[img])
         return x
 
 class RandomHorizontalFlip(object):
@@ -223,8 +231,7 @@ class RandomHorizontalFlip(object):
             for img in x.keys():
                 if img == 'id':
                     continue
-                for c in range(x[img].size()[0]):
-                    x[img][c] = F_t.hflip(x[img][c])
+                x[img] = F_t.vflip(x[img])
         return x
 
 class RandomRot90(object):
@@ -235,14 +242,16 @@ class RandomRot90(object):
             for img in x.keys():
                 if img == 'id':
                     continue
-                x[img] = torch.rot90(x[img])
+                for c in range(x[img].size(0)):
+                    x[img][c] = torch.rot90(x[img][c])
+        return x
 
 class RandomRotate(object):
     def __init__(self, p, range):
         self.p = p
         self.range = np.linspace(-range,range,range//5)
     def __call__(self, x):
-        if np.random.rand() <= self.p:
+        if torch.rand(1) < self.p:
             angle = np.random.choice(self.range)
             for img in x.keys():                
                 if img == 'id':
@@ -271,23 +280,24 @@ def calculate_mean_offset(base_image_type='corona'):
             print(dataset_type,image_type,'mean:',mean)
 
 # Visualization
-def display_sample(batch):
+def save_test_sample(batch):
     # batch_size = batch['ct_scan'].size()[0]
     ct_images = batch['ct_scan']
     lung_masks = batch['lung']
     inf_masks = batch['inf']
-    fig, axes = plt.subplots(4, 4, figsize=(16,10))
+    fig, axes = plt.subplots(3, 4, figsize=(16,10))
+    row = 0
     for i, ax in enumerate(axes.flatten()):
+        if i % 4 == 0:
+            row += 1
         # First Row ct_image
-        if i < 4:
-            ax.imshow(ct_images[i%4,0],cmap='bone')
-        elif i < 8:
-            ax.imshow(lung_masks[i%4,0],cmap='gray')
-        elif i < 12:
-            ax.imshow(lung_masks[i%4,1],cmap='gray')
-        else:
-            ax.imshow(inf_masks[i%4,0],cmap='gray')
-    plt.show()
+        ax.imshow(ct_images[i%4,0],cmap='bone')
+        if row == 2:
+            ax.imshow(lung_masks[i%4,0],cmap='nipy_spectral',alpha=0.5)
+        elif row == 3:
+            ax.imshow(inf_masks[i%4,0],cmap='nipy_spectral',alpha=0.5)
+    plt.savefig('sample2.png')
+    plt.close()
 
 # def collate_fn(batch):
 #     return tuple(zip(*batch))
@@ -299,14 +309,17 @@ if __name__=="__main__":
     test_transform = T.Compose([
         ToTensor(),
         RandomVerticalFlip(0.4),
-        RandomRotate(0.7,30)
+        RandomHorizontalFlip(0.4),
+        RandomRot90(0.2),
+        RandomRotate(0.3, 30)
     ])
     test_dataset = CTSliceDataset('train', 128, transform=test_transform)
     test_dataloader = DataLoader(
         test_dataset, batch_size=4, shuffle=True, num_workers=4,)
     for x in tqdm(test_dataloader):
         # continue
-        display_sample(x)
+        save_test_sample(x)
+        break
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():
     #     print(key)
