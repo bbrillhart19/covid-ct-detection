@@ -44,3 +44,11 @@ Fourth Train:
 11-28-21
 - Adding validation visuals (finally) for metrics and sample visuals
 - Infection Model is actually not terrible, it seems to overfit to the less confident lung areas, using full lung masks to train lung model should fix
+Fifth Train:
+- Definitely did not help with full lung masks
+
+12-1-21
+- Attempting train with combined model, single Unet with 2 channel output 
+- Will the loss function for the lung channel outweigh the infection channel?
+- Waste of time, can't optimize for infection, need to zoom on ROI
+- Need to figure out a consistent contour/edge-det/crop method to 'zoom' on RoI
