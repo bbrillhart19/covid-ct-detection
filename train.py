@@ -2,7 +2,6 @@ import os
 import torch
 import torch.nn as nn
 from torchvision import transforms as T
-from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchsummary import summary
 from tqdm import tqdm
@@ -15,7 +14,7 @@ IN_SIZE = 128
 DATA_PATH = 'data'
 BATCH_SIZE = 8
 LR = 0.0001
-PATIENCE = 1
+PATIENCE = 10
 GPU = True
 EXP_NAME = 'cropped_roi'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
@@ -325,28 +324,30 @@ def main():
     train_lung_model(lung_trainer, train_dataloader, val_dataloader)
 
     # Load best lung model from checkpoint
-    # lung_trainer.load_checkpoint()
+    lung_trainer.load_checkpoint()
     
     # Set infection model to train
-    # infection_trainer = ModelTrainer(
-    #     model = ResUnet(in_channels=2, out_channels=1),
-    #     device = get_default_device(gpu=GPU),
-    #     ckpt_path=MODEL_CKPTS['inf'],
-    #     metrics = BinaryMetrics(),
-    #     criterion = nn.BCELoss(reduction='mean'),
-    #     optim = torch.optim.Adam,
-    #     optim_args = dict(lr=LR),
-    #     lr_sched = torch.optim.lr_scheduler.StepLR,
-    #     lr_sched_args = dict(step_size=20,gamma=0.1),
-    # )
+    infection_trainer = ModelTrainer(
+        model = ResUnet(in_channels=2, out_channels=1),
+        device = get_default_device(gpu=GPU),
+        ckpt_path=MODEL_CKPTS['inf'],
+        metrics = BinaryMetrics(),
+        criterion = nn.BCELoss(reduction='mean'),
+        optim = torch.optim.Adam,
+        optim_args = dict(lr=LR),
+        lr_sched = torch.optim.lr_scheduler.StepLR,
+        lr_sched_args = dict(step_size=20,gamma=0.1),
+    )
 
-    # print('Infection Model >>>')
-    # print('Device:',infection_trainer.device)
-    # summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
+    print('Infection Model >>>')
+    print('Device:',infection_trainer.device)
+    summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
 
     # Train Infection model
-    # train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
-    # eval_models(lung_trainer, infection_trainer, val_dataloader)
+    train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
+
+    # Evaluate models
+    eval_models(lung_trainer, infection_trainer, val_dataloader)
 
 if __name__=="__main__":
     main()
