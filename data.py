@@ -14,6 +14,7 @@ from tqdm import tqdm
 from utils import *
 
 IMAGE_TYPES = ['corona','radio']
+IMAGE_THRESH = {'corona':50,'radio':175}
 R_LUNG = 1
 L_LUNG = 2
 INFECTION = 3
@@ -147,37 +148,35 @@ class CTSliceDataset(Dataset):
         self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]     
 
     def __getitem__(self, idx):
-        # Set image type id
+        # Set image type id and roi threshold
         for i, image_type in enumerate(IMAGE_TYPES):
             if image_type in self.ct_images[idx]:
-                image_type_id = i   
+                image_type_id = i
+                roi_thresh = IMAGE_THRESH[image_type]
 
-        # Load ct scan and resize
+        # Load ct scan
         ct_image = np.load(self.ct_images[idx])
+        ct_image = normalize(ct_image).astype(np.float32)       
+
+        # Get roi crop coordinates (based on image type threshold) and crop
+        roi = get_roi(ct_image,roi_thresh)
+        ct_image = crop_roi(ct_image,roi)
+
+        # Resize ct scan
         ct_image = resize(ct_image, self.size)
         ct_image = np.expand_dims(ct_image, axis=0)
-        ct_image = normalize(ct_image).astype(np.float32)
 
         # Get lung mask
-        # mask_id = self.ct_images[idx].replace('ct_scan','lung_and_infection_mask')
-        # mask = np.load(mask_id)
         lung_mask_id = self.ct_images[idx].replace('ct_scan','lung_mask')
         lung_mask = np.load(lung_mask_id)
- 
-        # 1-> RLung 2-> LLung 3 -> Infection
-        # Lung mask 2xHxW
-        # r_lung_mask = mask.copy()
-        # r_lung_mask[mask != R_LUNG] = 0
-        # r_lung_mask[mask == R_LUNG] = 1
-        # l_lung_mask = mask.copy()
-        # l_lung_mask[mask != L_LUNG] = 0
-        # l_lung_mask[mask == L_LUNG] = 1
+
+        # Use both lungs together
         lung_mask[lung_mask != 0] = 1
+
+        # Crop lung mask
+        lung_mask = crop_roi(lung_mask,roi)
         
-        # Resize lung masks and stack
-        # r_lung_mask = img_as_bool(resize(r_lung_mask, self.size)).astype(np.float32)
-        # l_lung_mask = img_as_bool(resize(l_lung_mask, self.size)).astype(np.float32)
-        # lung_mask = np.stack([r_lung_mask,l_lung_mask],axis=0)
+        # Resize lung mask
         lung_mask = img_as_bool(resize(lung_mask, self.size)).astype(np.float32)
         lung_mask = np.expand_dims(lung_mask, axis=0)
 
@@ -185,10 +184,10 @@ class CTSliceDataset(Dataset):
         inf_mask_id = self.ct_images[idx].replace('ct_scan','infection_mask')
         inf_mask = np.load(inf_mask_id)
 
-        # Infection mask 1xHxW        
-        # inf_mask = mask.copy()
-        # inf_mask[mask != INFECTION] = 0
-        # inf_mask[mask == INFECTION] = 1
+        # Crop infection mask
+        inf_mask = crop_roi(inf_mask,roi)
+
+        # Resize infection mask
         inf_mask = img_as_bool(resize(inf_mask, self.size)).astype(np.float32)
         inf_mask = np.expand_dims(inf_mask, axis=0)
 
@@ -296,7 +295,7 @@ def save_test_sample(batch):
             ax.imshow(lung_masks[i%4,0],cmap='nipy_spectral',alpha=0.5)
         elif row == 3:
             ax.imshow(inf_masks[i%4,0],cmap='nipy_spectral',alpha=0.5)
-    plt.savefig('sample2.png')
+    plt.savefig('sample3.png')
     plt.close()
 
 # def collate_fn(batch):
@@ -314,9 +313,9 @@ if __name__=="__main__":
         RandomRotate(0.3, 30)
     ])
     test_dataset = CTSliceDataset('train', 128, transform=test_transform)
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=4, shuffle=True, num_workers=4,)
-    for x in tqdm(test_dataloader):
+    test_dataloader = DataLoader(test_dataset, batch_size=4, shuffle=True, num_workers=1)
+    # for x in tqdm(test_dataloader):
+    for x in test_dataloader:
         # continue
         save_test_sample(x)
         break

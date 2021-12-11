@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import os
 from matplotlib import pyplot as plt
+from scipy.ndimage import binary_dilation
+import cv2
 
 def ensure(dirname):
     if not os.path.exists(dirname):
@@ -13,6 +15,25 @@ def get_default_device(gpu=True):
 
 def normalize(x):
     return (x - np.min(x)) / (np.max(x) - np.min(x))
+
+def get_roi(image, thresh):
+    data = image.copy()
+    data = data*255
+    data = data.astype(np.uint8)
+
+    mask = np.zeros_like(data)    
+    mask[data>thresh] = 255
+    mask_dil = binary_dilation(mask, iterations=5)
+    mask[mask_dil] = 255
+
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnt = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(cnt)
+    return (x, y, w, h)
+
+def crop_roi(image, roi):
+    x, y, w, h = roi
+    return image[y:y+h,x:x+w]
 
 def stack_infection_input(ct_image, lung_pred):
     # Stack with ct_image for infection model
