@@ -52,3 +52,13 @@ Fifth Train:
 - Will the loss function for the lung channel outweigh the infection channel?
 - Waste of time, can't optimize for infection, need to zoom on ROI
 - Need to figure out a consistent contour/edge-det/crop method to 'zoom' on RoI
+
+12-10-2021
+- Added RoI cropping method:
+    - Threshold image based on image type (corona or radio)
+        - Threshold is estimated from sample distributions in 0-255 scale
+    - Mask is dilated 5 iterations to seal up any possible missing connecting pixels
+    - Get external contours of image 
+    - Get contour with maximum areas
+    - return x, y, w, h from bounding rectangle
+

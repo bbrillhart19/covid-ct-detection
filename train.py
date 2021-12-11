@@ -15,9 +15,9 @@ IN_SIZE = 128
 DATA_PATH = 'data'
 BATCH_SIZE = 8
 LR = 0.0001
-PATIENCE = 10
+PATIENCE = 1
 GPU = True
-EXP_NAME = 'single_channel_lung'
+EXP_NAME = 'cropped_roi'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
 FROM_SAVE = {'lung':False,'inf':False}
@@ -183,9 +183,6 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
             lung_pred = lung_trainer.val_step(ct_image, None)
 
             # Stack ct_image with lung pred for infection model input
-            # ct_image = ct_image.detach().cpu()
-            # lung_pred = lung_pred.detach().cpu()
-            # inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
             inf_input = torch.concat([ct_image,lung_pred],dim=1).to(infection_trainer.device)
             
             # Train step on batch
@@ -211,9 +208,6 @@ def train_infection_model(lung_trainer, infection_trainer, train_dataloader, val
             lung_pred = lung_trainer.val_step(ct_image, None)
 
             # Stack ct_image with lung pred for infection model input
-            # ct_image = ct_image.detach().cpu()
-            # lung_pred = lung_pred.detach().cpu()
-            # inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
             inf_input = torch.concat([ct_image,lung_pred],dim=1).to(infection_trainer.device)
             
             # Val step on batch
@@ -254,9 +248,6 @@ def eval_models(lung_trainer, infection_trainer, val_dataloader):
         lung_pred = lung_trainer.val_step(ct_image, lung_mask)
 
         # Stack ct_image with lung pred for infection model input
-        # ct_image = ct_image.detach().cpu()
-        # lung_pred = lung_pred.detach().cpu()
-        # inf_input = stack_infection_input(ct_image, lung_pred).to(infection_trainer.device)
         inf_input = torch.concat([ct_image,lung_pred],dim=1).to(infection_trainer.device)
         
         # Val step on batch
@@ -331,31 +322,31 @@ def main():
     summary(lung_trainer.model,(1,IN_SIZE,IN_SIZE))
 
     # Train lung model
-    # train_lung_model(lung_trainer, train_dataloader, val_dataloader)
+    train_lung_model(lung_trainer, train_dataloader, val_dataloader)
 
     # Load best lung model from checkpoint
-    lung_trainer.load_checkpoint()
+    # lung_trainer.load_checkpoint()
     
     # Set infection model to train
-    infection_trainer = ModelTrainer(
-        model = ResUnet(in_channels=2, out_channels=1),
-        device = get_default_device(gpu=GPU),
-        ckpt_path=MODEL_CKPTS['inf'],
-        metrics = BinaryMetrics(),
-        criterion = nn.BCELoss(reduction='mean'),
-        optim = torch.optim.Adam,
-        optim_args = dict(lr=LR),
-        lr_sched = torch.optim.lr_scheduler.StepLR,
-        lr_sched_args = dict(step_size=20,gamma=0.1),
-    )
+    # infection_trainer = ModelTrainer(
+    #     model = ResUnet(in_channels=2, out_channels=1),
+    #     device = get_default_device(gpu=GPU),
+    #     ckpt_path=MODEL_CKPTS['inf'],
+    #     metrics = BinaryMetrics(),
+    #     criterion = nn.BCELoss(reduction='mean'),
+    #     optim = torch.optim.Adam,
+    #     optim_args = dict(lr=LR),
+    #     lr_sched = torch.optim.lr_scheduler.StepLR,
+    #     lr_sched_args = dict(step_size=20,gamma=0.1),
+    # )
 
-    print('Infection Model >>>')
-    print('Device:',infection_trainer.device)
-    summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
+    # print('Infection Model >>>')
+    # print('Device:',infection_trainer.device)
+    # summary(infection_trainer.model,(2,IN_SIZE,IN_SIZE))
 
     # Train Infection model
     # train_infection_model(lung_trainer, infection_trainer, train_dataloader, val_dataloader)
-    eval_models(lung_trainer, infection_trainer, val_dataloader)
+    # eval_models(lung_trainer, infection_trainer, val_dataloader)
 
 if __name__=="__main__":
     main()
