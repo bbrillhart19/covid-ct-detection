@@ -138,11 +138,14 @@ class CTDataLoader():
         plt.show()
 
 class CTSliceDataset(Dataset):
-    def __init__(self, data_path, size, transform=None):
+    def __init__(self, data_path, size, transform=None, crop=True, patching=True, patch_factor=2):
         # Lung mode for training SSD, infection mode for Unet (not available yet)
         self.data_path = data_path
         self.transform = transform
         self.size = (size, size)
+        self.crop = crop
+        self.patching = patching
+        self.patch_factor = patch_factor
 
         ct_path = os.path.join(self.data_path,'ct_scan')
         self.ct_images = [os.path.join(ct_path,ct_image) for ct_image in os.listdir(ct_path)]     
@@ -156,40 +159,43 @@ class CTSliceDataset(Dataset):
 
         # Load ct scan
         ct_image = np.load(self.ct_images[idx])
-        ct_image = normalize(ct_image).astype(np.float32)       
-
-        # Get roi crop coordinates (based on image type threshold) and crop
-        roi = get_roi(ct_image,roi_thresh)
-        ct_image = crop_roi(ct_image,roi)
-
-        # Resize ct scan
-        ct_image = resize(ct_image, self.size)
-        ct_image = np.expand_dims(ct_image, axis=0)
+        ct_image = normalize(ct_image).astype(np.float32) 
 
         # Get lung mask
         lung_mask_id = self.ct_images[idx].replace('ct_scan','lung_mask')
-        lung_mask = np.load(lung_mask_id)
-
-        # Use both lungs together
-        lung_mask[lung_mask != 0] = 1
-
-        # Crop lung mask
-        lung_mask = crop_roi(lung_mask,roi)
+        lung_mask = np.load(lung_mask_id) 
         
-        # Resize lung mask
-        lung_mask = img_as_bool(resize(lung_mask, self.size)).astype(np.float32)
-        lung_mask = np.expand_dims(lung_mask, axis=0)
+        # Use both lungs together
+        lung_mask[lung_mask != 0] = 1  
 
         # Get Infection Mask
         inf_mask_id = self.ct_images[idx].replace('ct_scan','infection_mask')
         inf_mask = np.load(inf_mask_id)
 
-        # Crop infection mask
-        inf_mask = crop_roi(inf_mask,roi)
+        if self.crop:
+            # Get roi crop coordinates (based on image type threshold) and crop
+            roi = get_roi(ct_image,roi_thresh)
+            ct_image = crop_roi(ct_image,roi)
+            lung_mask = crop_roi(lung_mask,roi)
+            inf_mask = crop_roi(inf_mask,roi)
+        
+        # Resize ct scan
+        ct_image = resize(ct_image, self.size)
+        ct_image = np.expand_dims(ct_image, axis=0)   
+
+        # Resize lung mask
+        lung_mask = img_as_bool(resize(lung_mask, self.size)).astype(np.float32)
+        lung_mask = np.expand_dims(lung_mask, axis=0)
 
         # Resize infection mask
         inf_mask = img_as_bool(resize(inf_mask, self.size)).astype(np.float32)
         inf_mask = np.expand_dims(inf_mask, axis=0)
+
+        if self.patching:
+            # Patch data by patch factor
+            ct_image = patch(ct_image, self.patch_factor)
+            lung_mask = patch(lung_mask, self.patch_factor)
+            inf_mask = patch(inf_mask, self.patch_factor)        
 
         x = {'ct_scan':ct_image,'lung':lung_mask,'inf':inf_mask,'id':image_type_id}
 
@@ -316,8 +322,14 @@ if __name__=="__main__":
     test_dataloader = DataLoader(test_dataset, batch_size=4, shuffle=True, num_workers=1)
     # for x in tqdm(test_dataloader):
     for x in test_dataloader:
-        # continue
-        save_test_sample(x)
+        ct_image = x['ct_scan']
+        ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:]))
+        print(ct_image.shape)
+        # print(x['ct_scan'].shape)
+        fig, axes = plt.subplots(4,4)
+        for j, ax in enumerate(axes.flatten()):
+            ax.imshow(ct_image[j,0],cmap='bone')
+        plt.show()
         break
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():

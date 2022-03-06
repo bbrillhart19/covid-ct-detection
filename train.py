@@ -251,12 +251,12 @@ def train_patched_infection_model(infection_trainer, train_dataloader, val_datal
             ct_image, inf_mask, image_type = \
                 train_data['ct_scan'], train_data['inf'], train_data['id']
 
-            # Split image into patch_factor**2 patches
-            ct_image_patched = patch(ct_image, PATCH_FACTOR).to(infection_trainer.device)
-            inf_mask_patched = patch(inf_mask, PATCH_FACTOR).to(infection_trainer.device) 
+            # Reshape patched batch
+            ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(infection_trainer.device)
+            inf_mask = torch.reshape(inf_mask,(-1,*inf_mask.shape[2:])).to(infection_trainer.device)            
 
             # Train step on batch
-            inf_pred = infection_trainer.train_step(ct_image_patched, inf_mask_patched)
+            inf_pred = infection_trainer.train_step(ct_image, inf_mask)
 
         # Output and append train loss
         train_loss = infection_trainer.get_train_loss()
@@ -271,12 +271,12 @@ def train_patched_infection_model(infection_trainer, train_dataloader, val_datal
             ct_image, inf_mask, image_type = \
                 val_data['ct_scan'], val_data['inf'], val_data['id']
 
-            # Split image into patch_factor**2 patches
-            ct_image_patched = patch(ct_image, PATCH_FACTOR).to(infection_trainer.device)
-            inf_mask_patched = patch(inf_mask, PATCH_FACTOR).to(infection_trainer.device) 
+            # Reshape patched batch
+            ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(infection_trainer.device)
+            inf_mask = torch.reshape(inf_mask,(-1,*inf_mask.shape[2:])).to(infection_trainer.device)     
 
             # Val step on batch
-            inf_pred = infection_trainer.val_step(ct_image_patched, inf_mask_patched)            
+            inf_pred = infection_trainer.val_step(ct_image, inf_mask)            
 
         # Output and append val losses
         val_loss = infection_trainer.get_val_loss()
@@ -362,12 +362,12 @@ def main():
         RandomRot90(0.2),
         RandomRotate(0.3, 30)
     ])
-    train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform)
+    train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform,crop=True,patching=True,patch_factor=PATCH_FACTOR)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
     # Get val dataloader
     transform = T.Compose([ToTensor()])
-    val_dataset = CTSliceDataset('val', IN_SIZE, transform=transform)
+    val_dataset = CTSliceDataset('val', IN_SIZE, transform=transform,crop=True,patching=True,patch_factor=PATCH_FACTOR)
     val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8)
 
     # Set lung model to train    

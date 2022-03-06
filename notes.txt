@@ -62,3 +62,9 @@ Fifth Train:
     - Get contour with maximum areas
     - return x, y, w, h from bounding rectangle
 
+03-06-2022
+We Back!
+- Attempted training infection model with images split into quadrants (patch factor = 2)
+- Caused cuda errors, likely to do with multiprocessing
+- Try implementing patching into dataloader??
+

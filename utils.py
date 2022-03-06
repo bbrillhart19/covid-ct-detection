@@ -43,22 +43,36 @@ def stack_infection_input(ct_image, lung_pred):
     return torch.cat((ct_image,lungs),dim=1)
 
 def patch(x, patch_factor):
-    patch_size = (x.shape[-2] // patch_factor, x.shape[-1] // patch_factor)
-    patched = torch.empty((x.shape[0]*patch_factor**2,x.shape[1],*patch_size))
-    for i in range(x.shape[0]): 
-        j = 0
-        for k in range(patch_factor**2):
-            patch = (
-                k % patch_factor * patch_size[0],
-                k % patch_factor * patch_size[0] + patch_size[0],
-                j * patch_size[1],
-                j * patch_size[1] + patch_size[1]
-            )
-            patched[i+k*patch_factor**2] = x[i,0,patch[0]:patch[1],patch[2]:patch[3]]
-            if (k + 1) % patch_factor == 0:
-                j += 1
-            if j == patch_factor:
-                j = 0
+    patch_size = (x.shape[1] // patch_factor, x.shape[2] // patch_factor)
+    # patched = torch.empty((x.shape[0]*patch_factor**2,x.shape[1],*patch_size))
+    patched = np.empty((patch_factor**2,x.shape[0],*patch_size))
+    # for i in range(x.shape[0]): 
+    #     j = 0
+    #     for k in range(patch_factor**2):
+    #         patch = (
+    #             k % patch_factor * patch_size[0],
+    #             k % patch_factor * patch_size[0] + patch_size[0],
+    #             j * patch_size[1],
+    #             j * patch_size[1] + patch_size[1]
+    #         )
+    #         patched[i+k*patch_factor**2] = x[i,0,patch[0]:patch[1],patch[2]:patch[3]]
+    #         if (k + 1) % patch_factor == 0:
+    #             j += 1
+    #         if j == patch_factor:
+    #             j = 0
+    j = 0
+    for i in range(patched.shape[0]):
+        patch = (
+            i % patch_factor * patch_size[0],
+            i % patch_factor * patch_size[0] + patch_size[0],
+            j * patch_size[1],
+            j * patch_size[1] + patch_size[1]
+        )
+        patched[i] = x[:,patch[0]:patch[1],patch[2]:patch[3]]
+        if (i + 1) % patch_factor == 0:
+            j += 1
+        if j == patch_factor:
+            j = 0
     return patched
 
 def save_sample(ct_image, lung_mask, lung_pred, inf_mask, inf_pred, folder, num_samples=4):
