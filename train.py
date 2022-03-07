@@ -11,13 +11,13 @@ from utils import *
 
 SPLIT_DATA = False
 PATCH_FACTOR = 2
-IN_SIZE = 128
+IN_SIZE = 256
 DATA_PATH = 'data'
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 LR = 0.0001
 PATIENCE = 10
 GPU = True
-EXP_NAME = 'patched_inf_model'
+EXP_NAME = 'res256_reduced_augs_patched_inf_model'
 MODEL_LOGS = ensure(os.path.join('model_logs',EXP_NAME))
 MODEL_CKPTS = {'lung':os.path.join(MODEL_LOGS,'unet_lung.pt'),'inf':os.path.join(MODEL_LOGS,'unet_infection.pt')} 
 FROM_SAVE = {'lung':False,'inf':False}
@@ -366,10 +366,10 @@ def main():
     aug_transform = T.Compose([
         ToTensor(),
         # PatchReshape(),
-        RandomVerticalFlip(0.4),
-        RandomHorizontalFlip(0.4),
-        RandomRot90(0.2),
-        RandomRotate(0.3, 30)
+        RandomVerticalFlip(0.2),
+        RandomHorizontalFlip(0.2),
+        RandomRot90(0.1),
+        RandomRotate(0.1, 10)
     ])
     train_dataset = CTSliceDataset('train', IN_SIZE, transform=aug_transform,crop=True,patching=True,patch_factor=PATCH_FACTOR)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)

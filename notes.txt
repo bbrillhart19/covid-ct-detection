@@ -67,4 +67,7 @@ We Back!
 - Attempted training infection model with images split into quadrants (patch factor = 2)
 - Caused cuda errors, likely to do with multiprocessing
 - Try implementing patching into dataloader??
+- No difference with patching implemented, too much benign data?
+- Increase res to 256 (128 patch size) and got OOM
+
 
