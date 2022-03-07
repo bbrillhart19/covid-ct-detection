@@ -217,6 +217,16 @@ class ToTensor(object):
                 x[img] = torch.from_numpy(x[img])
         return x
 
+class PatchReshape(object):
+    def __call__(self, x):
+        for img in x.keys():
+            if img == 'id':
+                continue
+            print('In:',x[img].shape)
+            x[img] = torch.reshape(x[img],(-1,*x[img].shape[2:]))
+            print('Out:',x[img].shape)
+        return x
+
 class RandomVerticalFlip(object):
     def __init__(self, p):
         self.p = p
@@ -247,8 +257,9 @@ class RandomRot90(object):
             for img in x.keys():
                 if img == 'id':
                     continue
-                for c in range(x[img].size(0)):
-                    x[img][c] = torch.rot90(x[img][c])
+                for i in range(x[img].size(0)):
+                    for c in range(x[img].size(1)):
+                        x[img][i,c] = torch.rot90(x[img][i,c])
         return x
 
 class RandomRotate(object):
@@ -301,7 +312,7 @@ def save_test_sample(batch):
             ax.imshow(lung_masks[i%4,0],cmap='nipy_spectral',alpha=0.5)
         elif row == 3:
             ax.imshow(inf_masks[i%4,0],cmap='nipy_spectral',alpha=0.5)
-    plt.savefig('sample3.png')
+    plt.savefig('sample4.png')
     plt.close()
 
 # def collate_fn(batch):
@@ -311,6 +322,7 @@ if __name__=="__main__":
     # calculate_mean_offset()
     # dataloader = CTDataLoader('data')
     # dataloader.split_data()
+    #TODO: Fix sampling to show more samples with patched data
     test_transform = T.Compose([
         ToTensor(),
         RandomVerticalFlip(0.4),
@@ -323,13 +335,15 @@ if __name__=="__main__":
     # for x in tqdm(test_dataloader):
     for x in test_dataloader:
         ct_image = x['ct_scan']
-        ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:]))
-        print(ct_image.shape)
-        # print(x['ct_scan'].shape)
-        fig, axes = plt.subplots(4,4)
-        for j, ax in enumerate(axes.flatten()):
-            ax.imshow(ct_image[j,0],cmap='bone')
-        plt.show()
+        print('In:',ct_image.shape,ct_image.dtype)
+        # to float32 very important
+        ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(torch.float32)
+        print('Out:',ct_image.shape,ct_image.dtype)
+        save_test_sample(x)
+        # fig, axes = plt.subplots(4,4)
+        # for j, ax in enumerate(axes.flatten()):
+        #     ax.imshow(ct_image[j,0],cmap='bone')
+        # plt.show()
         break
     # dataloader.display_all(0,slice_num=5)
     # for key in dataloader.metadata_df.keys():

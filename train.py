@@ -250,10 +250,14 @@ def train_patched_infection_model(infection_trainer, train_dataloader, val_datal
         for train_data in tqdm(train_dataloader, desc='Epoch ['+str(epoch)+']'):
             ct_image, inf_mask, image_type = \
                 train_data['ct_scan'], train_data['inf'], train_data['id']
-
-            # Reshape patched batch
-            ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(infection_trainer.device)
-            inf_mask = torch.reshape(inf_mask,(-1,*inf_mask.shape[2:])).to(infection_trainer.device)            
+            
+            # Reshape patched batch, 
+            ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(torch.float32)
+            inf_mask = torch.reshape(inf_mask,(-1,*inf_mask.shape[2:])).to(torch.float32)
+            
+            # Send to device
+            ct_image = ct_image.to(infection_trainer.device)
+            inf_mask = inf_mask.to(infection_trainer.device)
 
             # Train step on batch
             inf_pred = infection_trainer.train_step(ct_image, inf_mask)
@@ -272,8 +276,12 @@ def train_patched_infection_model(infection_trainer, train_dataloader, val_datal
                 val_data['ct_scan'], val_data['inf'], val_data['id']
 
             # Reshape patched batch
-            ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(infection_trainer.device)
-            inf_mask = torch.reshape(inf_mask,(-1,*inf_mask.shape[2:])).to(infection_trainer.device)     
+            ct_image = torch.reshape(ct_image,(-1,*ct_image.shape[2:])).to(torch.float32)
+            inf_mask = torch.reshape(inf_mask,(-1,*inf_mask.shape[2:])).to(torch.float32)
+
+            # Send to device
+            ct_image = ct_image.to(infection_trainer.device)
+            inf_mask = inf_mask.to(infection_trainer.device)     
 
             # Val step on batch
             inf_pred = infection_trainer.val_step(ct_image, inf_mask)            
@@ -357,6 +365,7 @@ def main():
     # Get train dataloader #TODO: Transforms
     aug_transform = T.Compose([
         ToTensor(),
+        # PatchReshape(),
         RandomVerticalFlip(0.4),
         RandomHorizontalFlip(0.4),
         RandomRot90(0.2),
