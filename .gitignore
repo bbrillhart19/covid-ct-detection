@@ -5,6 +5,7 @@ train/
 val/
 results/
 model_logs/
+train_samples/
 .DS_Store
 
 # Byte-compiled / optimized / DLL files
