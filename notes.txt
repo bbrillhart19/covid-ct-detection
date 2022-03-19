@@ -74,4 +74,8 @@ We Back!
 - Implemented patching into dataloader
 - Patching training was ultimately no better than previous attempts
 
+03-19-2022
+- Added testing function, no patching implemented
+
+
 
