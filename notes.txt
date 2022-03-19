@@ -70,4 +70,8 @@ We Back!
 - No difference with patching implemented, too much benign data?
 - Increase res to 256 (128 patch size) and got OOM
 
+03-07-2022
+- Implemented patching into dataloader
+- Patching training was ultimately no better than previous attempts
+
 
